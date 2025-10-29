@@ -11,10 +11,10 @@ else
 fi
 
 # Create wireguard directory if it doesn't exist
-mkdir -p wireguard
+mkdir -p wireguard/wg_confs/
 
 # Generate WireGuard configuration
-cat > wireguard/wg0.conf <<EOF
+cat > wireguard/wg_confs/wg0.conf <<EOF
 [Interface]
 PrivateKey = ${WG_PRIVATE_KEY}
 Address = ${WG_ADDRESS}
@@ -26,23 +26,15 @@ PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACC
 
 [Peer]
 PublicKey = ${WG_SERVER_PUBLIC_KEY}
-EOF
-
-# Add preshared key if provided
-if [ ! -z "$WG_PRESHARED_KEY" ]; then
-    echo "PresharedKey = ${WG_PRESHARED_KEY}" >> wireguard/wg0.conf
-fi
-
-cat >> wireguard/wg0.conf <<EOF
 Endpoint = ${WG_SERVER_ENDPOINT}
 AllowedIPs = ${WG_ALLOWED_IPS}
-PersistentKeepalive = ${WG_PERSISTENT_KEEPALIVE}
+PersistentKeepalive = 25
 EOF
 
 echo "WireGuard configuration generated successfully at wireguard/wg0.conf"
 
 # Set proper permissions
-chmod 600 wireguard/wg0.conf
+chmod 600 wireguard/wg_confs/wg0.conf
 
 # Create Caddy directories
 mkdir -p caddy_data caddy_config
