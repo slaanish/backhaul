@@ -1,0 +1,96 @@
+# Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                          Internet                                │
+└────────────────────────┬────────────────────────────────────────┘
+                         │
+                         │ HTTPS/TLS (443)
+                         │ HTTP (80)
+                         │
+                         ▼
+         ┌───────────────────────────────┐
+         │   WireGuard VPN Server        │
+         │   (Public IP)                 │
+         │                               │
+         │   - Port forwarding:          │
+         │     80 → 10.0.0.2:80         │
+         │     443 → 10.0.0.2:443       │
+         └───────────────┬───────────────┘
+                         │
+                         │ Encrypted WireGuard Tunnel
+                         │ (UDP 51820)
+                         │
+         ┌───────────────▼────────────────┐
+         │   Docker Host                  │
+         │                                │
+         │  ┌──────────────────────────┐  │
+         │  │  WireGuard Container     │  │
+         │  │                          │  │
+         │  │  Interface: wg0          │  │
+         │  │  IP: 10.0.0.2/24        │  │
+         │  │                          │  │
+         │  │  ┌────────────────────┐  │  │
+         │  │  │  Caddy Container   │  │  │
+         │  │  │  (network_mode:    │  │  │
+         │  │  │   service:wg)      │  │  │
+         │  │  │                    │  │  │
+         │  │  │  - HTTPS (443)     │  │  │
+         │  │  │  - HTTP (80)       │  │  │
+         │  │  │  - Let's Encrypt   │  │  │
+         │  │  │  - DNS Challenge   │  │  │
+         │  │  └──────┬─────────────┘  │  │
+         │  └─────────┼────────────────┘  │
+         │            │                   │
+         │            │ Reverse Proxy     │
+         │            │                   │
+         │  ┌─────────▼────────────────┐  │
+         │  │  Backend Container       │  │
+         │  │  (Your Application)      │  │
+         │  │                          │  │
+         │  │  - Port 8080             │  │
+         │  │  - nginx/app/etc         │  │
+         │  └──────────────────────────┘  │
+         └────────────────────────────────┘
+
+Key Features:
+═════════════
+
+1. Network Isolation
+   └─ Caddy runs in WireGuard's network namespace
+   └─ All Caddy traffic automatically routes through VPN
+
+2. Traffic Flow
+   └─ Internet → WG Server → WG Tunnel → Caddy → Backend
+   └─ All traffic encrypted end-to-end
+
+3. DNS Challenge
+   └─ Caddy performs DNS-01 challenge through tunnel
+   └─ No need to expose port 80 publicly
+   └─ Works behind NAT/firewall
+
+4. Configuration
+   └─ All settings via environment variables
+   └─ WireGuard config auto-generated
+   └─ Caddy config templated with env vars
+
+Components:
+═══════════
+
+┌─────────────────┬──────────────────────────────────────────┐
+│ Component       │ Purpose                                  │
+├─────────────────┼──────────────────────────────────────────┤
+│ WireGuard       │ • VPN tunnel (backhaul)                 │
+│ Container       │ • Network namespace for Caddy            │
+│                 │ • IP forwarding and NAT                  │
+├─────────────────┼──────────────────────────────────────────┤
+│ Caddy           │ • HTTPS/TLS termination                  │
+│ Container       │ • Automatic Let's Encrypt certs          │
+│                 │ • DNS-01 challenge handling              │
+│                 │ • Reverse proxy to backend               │
+├─────────────────┼──────────────────────────────────────────┤
+│ Backend         │ • Your application                       │
+│ Container       │ • Receives proxied requests              │
+│                 │ • No direct internet exposure            │
+└─────────────────┴──────────────────────────────────────────┘
+```

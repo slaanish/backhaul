@@ -1,0 +1,240 @@
+# Quick Start Guide
+
+## Prerequisites Checklist
+- [ ] Docker and Docker Compose installed
+- [ ] WireGuard server with public IP running
+- [ ] Domain name registered
+- [ ] DNS API credentials (Cloudflare, Route53, etc.)
+- [ ] WireGuard private key generated
+
+## Step-by-Step Setup
+
+### 1. Download and Extract Files
+Download all files and place them in a directory (e.g., `wireguard-caddy`).
+
+### 2. Generate WireGuard Keys (if needed)
+```bash
+# Generate private key
+wg genkey | tee privatekey | wg pubkey > publickey
+
+# Generate preshared key (optional)
+wg genpsk > presharedkey
+
+# View keys
+cat privatekey
+cat publickey
+```
+
+### 3. Configure Environment
+```bash
+# Copy example environment file
+cp .env.example .env
+
+# Edit with your values
+nano .env
+```
+
+**Required values:**
+```bash
+DOMAIN=yourdomain.com
+ACME_EMAIL=admin@yourdomain.com
+DNS_PROVIDER=cloudflare
+DNS_API_TOKEN=your_api_token_here
+WG_PRIVATE_KEY=your_wireguard_private_key
+WG_SERVER_PUBLIC_KEY=server_public_key
+WG_SERVER_ENDPOINT=vpn.example.com:51820
+```
+
+### 4. Point DNS to WireGuard Server
+Update your domain's DNS A record to point to your WireGuard server's public IP.
+
+```
+A    yourdomain.com    →  1.2.3.4  (WG server IP)
+A    *.yourdomain.com  →  1.2.3.4  (for subdomains)
+```
+
+### 5. Configure WireGuard Server Port Forwarding
+On your WireGuard server, forward ports to the client:
+
+```bash
+# Replace 10.0.0.2 with your WG_ADDRESS from .env
+iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 80 -j DNAT --to-destination 10.0.0.2:80
+iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 443 -j DNAT --to-destination 10.0.0.2:443
+iptables -A FORWARD -p tcp -d 10.0.0.2 --dport 80 -j ACCEPT
+iptables -A FORWARD -p tcp -d 10.0.0.2 --dport 443 -j ACCEPT
+
+# Make persistent
+apt install iptables-persistent
+netfilter-persistent save
+```
+
+### 6. Generate Configuration and Start
+```bash
+# Generate WireGuard config from .env
+./setup.sh
+
+# Start all services
+docker-compose up -d
+
+# Watch logs
+docker-compose logs -f
+```
+
+### 7. Verify Setup
+```bash
+# Run health check
+./health-check.sh
+
+# Or manually check:
+
+# Check WireGuard connection
+docker-compose exec wireguard wg show
+
+# Check if Caddy is running
+docker-compose ps
+
+# Check certificate acquisition (wait a few minutes)
+docker-compose logs caddy | grep -i certificate
+```
+
+### 8. Test Your Website
+```bash
+# From your local machine
+curl -I https://yourdomain.com
+
+# Should return 200 OK with valid SSL certificate
+```
+
+## Common Commands
+
+```bash
+# Start services
+docker-compose up -d
+
+# Stop services
+docker-compose down
+
+# View logs
+docker-compose logs -f
+docker-compose logs -f caddy
+docker-compose logs -f wireguard
+
+# Restart a service
+docker-compose restart caddy
+
+# Check WireGuard status
+docker-compose exec wireguard wg show
+
+# Shell into container
+docker-compose exec wireguard bash
+docker-compose exec caddy sh
+
+# Update and restart
+docker-compose pull
+docker-compose up -d
+
+# View certificates
+ls -la caddy_data/caddy/certificates/
+```
+
+## Troubleshooting Quick Reference
+
+### Issue: WireGuard not connecting
+```bash
+# Check server endpoint is correct in .env
+# Verify server is running: on WG server run:
+wg show
+
+# Check client config
+docker-compose exec wireguard cat /config/wg0.conf
+
+# Restart WireGuard
+docker-compose restart wireguard
+```
+
+### Issue: Certificate not issued
+```bash
+# Check Caddy logs for errors
+docker-compose logs caddy | grep -i error
+
+# Verify DNS API token has correct permissions
+# Check DNS is pointing to WG server IP
+dig yourdomain.com
+
+# Try Let's Encrypt staging first (edit Caddyfile)
+```
+
+### Issue: Can't reach website
+```bash
+# Verify port forwarding on WG server
+# Check firewall allows UDP 51820 on server
+# Verify DNS propagation
+dig yourdomain.com
+
+# Check Caddy is listening
+docker-compose exec wireguard netstat -tuln | grep -E ':80|:443'
+```
+
+### Issue: Backend not reachable
+```bash
+# Check backend is running
+docker-compose ps
+
+# Verify BACKEND_HOST and BACKEND_PORT in .env
+# Check Caddyfile reverse_proxy configuration
+
+# Test from Caddy container
+docker-compose exec wireguard wget -O- http://backend:8080
+```
+
+## File Structure
+
+```
+wireguard-caddy/
+├── .env                    # Your configuration (create from .env.example)
+├── .env.example            # Example configuration
+├── .gitignore              # Git ignore rules
+├── docker-compose.yml      # Main Docker Compose file
+├── docker-compose.custom.yml # Alternative with custom Caddy build
+├── Dockerfile.caddy        # Custom Caddy build with DNS modules
+├── Caddyfile              # Caddy configuration
+├── Caddyfile.advanced     # Advanced Caddyfile examples
+├── setup.sh               # Setup script
+├── health-check.sh        # Health check script
+├── README.md              # Full documentation
+├── ARCHITECTURE.txt       # Architecture diagram
+├── wireguard/
+│   ├── wg0.conf           # Generated by setup.sh
+│   └── wg0.conf.template  # Template file
+├── caddy_data/            # Created automatically
+└── caddy_config/          # Created automatically
+```
+
+## Next Steps
+
+1. **Customize Caddyfile**: Modify for your specific needs
+2. **Add backend service**: Uncomment in docker-compose.yml or point to external service
+3. **Set up monitoring**: Add logging and alerting
+4. **Enable rate limiting**: Uncomment rate_limit in Caddyfile
+5. **Add more domains**: Add additional domain blocks to Caddyfile
+6. **Backup configuration**: Regularly backup wireguard/ and caddy_data/ directories
+
+## Support Resources
+
+- **Caddy Documentation**: https://caddyserver.com/docs/
+- **WireGuard Documentation**: https://www.wireguard.com/
+- **Docker Compose Documentation**: https://docs.docker.com/compose/
+- **Let's Encrypt**: https://letsencrypt.org/docs/
+
+## Security Reminders
+
+- Keep `.env` file secure (never commit to git)
+- Use strong WireGuard keys
+- Regularly update Docker images
+- Monitor logs for suspicious activity
+- Consider adding fail2ban or rate limiting
+- Use preshared keys for quantum resistance
+
+---
+
+**Need help?** Review README.md for detailed explanations.

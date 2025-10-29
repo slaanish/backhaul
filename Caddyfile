@@ -1,0 +1,40 @@
+{
+    email {$ACME_EMAIL}
+    # Enable debug logging if needed
+    # debug
+}
+
+{$DOMAIN} {
+    # DNS challenge for Let's Encrypt
+    tls {
+        dns {$DNS_PROVIDER} {$DNS_API_TOKEN}
+    }
+
+    # Reverse proxy to backend service
+    reverse_proxy {$BACKEND_HOST}:{$BACKEND_PORT}
+
+    # Optional: Add custom headers
+    header {
+        # Security headers
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Access logging
+    log {
+        output file /data/access.log
+        format json
+    }
+
+    # Optional: Rate limiting
+    # rate_limit {
+    #     zone dynamic {
+    #         key {remote_host}
+    #         events 100
+    #         window 1m
+    #     }
+    # }
+}

@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  wireguard:
+    image: linuxserver/wireguard:latest
+    container_name: wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ./wireguard:/config
+      - /lib/modules:/lib/modules:ro
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv4.ip_forward=1
+    restart: unless-stopped
+    networks:
+      - wireguard_network
+
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    network_mode: "service:wireguard"
+    environment:
+      - DOMAIN=${DOMAIN}
+      - BACKEND_HOST=${BACKEND_HOST:-localhost}
+      - BACKEND_PORT=${BACKEND_PORT:-8080}
+      - DNS_PROVIDER=${DNS_PROVIDER:-cloudflare}
+      - DNS_API_TOKEN=${DNS_API_TOKEN}
+      - ACME_EMAIL=${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy_data:/data
+      - ./caddy_config:/config
+    restart: unless-stopped
+    depends_on:
+      - wireguard
+
+  # Optional: Example backend service
+  # backend:
+  #   image: nginx:alpine
+  #   container_name: backend
+  #   networks:
+  #     - wireguard_network
+  #   restart: unless-stopped
+
+networks:
+  wireguard_network:
+    driver: bridge
