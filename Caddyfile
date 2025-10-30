@@ -8,7 +8,7 @@
 }
 
 # Main domain
-{$DOMAIN} {
+remote.{$DOMAIN} {
     # DNS challenge for Let's Encrypt
     tls {
         dns {$DNS_PROVIDER} {$DNS_API_TOKEN}

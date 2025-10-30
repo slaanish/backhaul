@@ -46,20 +46,7 @@ mkdir wireguard-caddy && cd wireguard-caddy
 # Copy all files from this project
 ```
 
-### 2. Generate WireGuard Keys (if needed)
-
-```bash
-# Generate private key
-wg genkey > private.key
-
-# Generate public key from private key
-cat private.key | wg pubkey > public.key
-
-# Generate preshared key (optional)
-wg genpsk > preshared.key
-```
-
-### 3. Configure Environment Variables
+### 2. Configure Environment Variables
 
 ```bash
 cp .env.example .env
@@ -89,7 +76,7 @@ WG_SERVER_ENDPOINT=vpn.yourserver.com:51820
 WG_ALLOWED_IPS=0.0.0.0/0  # Route all traffic through tunnel
 ```
 
-### 4. Generate Configuration and Start
+### 3. Generate Configuration and Start
 
 ```bash
 # Generate WireGuard config from environment variables
